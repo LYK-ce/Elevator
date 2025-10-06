@@ -10,13 +10,14 @@ import sys
 from multiprocessing import Event, Queue
 import random
 from utils import Message
+import time
 #定义常量
 WAITING = 100
 WAITING_RANDOM = 100
 ELEVATOR_X = [275, 425, 575, 725]
 DESTROY = 900
 FLOOR_HEIGHT = 150
-MAX_FRAME = 60
+MAX_FRAME = 30
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
@@ -104,6 +105,10 @@ def GUI(start_event, finish_event, message_queue):
 
     elevator_num = 0
 
+    #处理特殊情况使用的队列
+    delayed_queue = Queue()
+    delayed_process = False
+
 
     # 主循环
     running = True
@@ -114,49 +119,61 @@ def GUI(start_event, finish_event, message_queue):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            
-        # if start_event.is_set() and not updateing:
+        
+        #必须等到调度算法的一个tick完成之后，同时不处在更新状态时才能进行下一次更新
+        #if start_event.is_set() and not updateing:
         if not updateing:
+            print(f'updating current time',time.perf_counter())
             #根据message_queue中的信息，更新电梯和乘客的target位置
             while not message_queue.empty():
                 message = message_queue.get()
-                print("GUI收到消息：", message)
+                #print("GUI收到消息：", message)
+                if message.delay == True:
+                #如果出现了delay的message，表示此消息要暂缓一个tick执行，放在下一个tick执行，因此先将其暂存到delaye queue当中。
+                    message.delay = False
+                    delayed_queue.put(message)
+                    delayed_process = True
+                else:
                 #消息分为三类，实例化消息，电梯消息和乘客消息
                 #对于实例化消息，根据传入的类型，创建相应的电梯和乘客对象
                 #对于电梯消息，更新电梯位置
                 #对于乘客消息，更新电梯位置，需要注意的是，位于电梯中的乘客随电梯上升或者下降位置也需要设置成事件发送过来
-                if message.type == 'init':
-                    if message.object== 'elevator':
-                        new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor), 'Sprite\elevator.png')
-                        new_elevator.id = message.id
-                        elevators.add(new_elevator)
-                        elevator_num += 1
+                    if message.type == 'init':
+                        if message.object== 'elevator':
+                            new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor), 'Sprite\elevator.png')
+                            new_elevator.id = message.id
+                            print("创建电梯对象：", new_elevator)
+                            elevators.add(new_elevator)
+                            elevator_num += 1
 
-                    elif message.object== 'passenger':
-                        #在waiting位置上随机偏移一个位置生成对应的角色
-                        new_person = Person(WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor), 'Sprite\passenger01.png')
-                        new_person.id = message.id
-                        passengers.add(new_person)
+                        elif message.object== 'passenger':
+                            #在waiting位置上随机偏移一个位置生成对应的角色
+                            new_person = Person(WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor), 'Sprite\passenger01.png')
+                            new_person.id = message.id
+                            passengers.add(new_person)
+                            
 
-                elif message.type == 'elevator':
-                    elevator = elevators.sprites()[message.id]
-                    elevator.target = (ELEVATOR_X[message.id], Floor_To_Y(message.floor))   
+                    elif message.type == 'elevator':
+                        elevator = elevators.sprites()[message.id]
+                        elevator.target = (ELEVATOR_X[message.id], Floor_To_Y(message.floor))   
 
-                elif message.type == 'passenger':
-                    passenger = passengers.sprites()[message.id]
-                    #视情况而定，passenger要去往哪里
-                    #到达楼层，前往销毁位置处
-                    if message.state == -1:
-                        passenger.target = (DESTROY, passenger.anchor[1])
-                    #站在电梯里，随电梯前往特定位置
-                    elif message.state == -2:
-                        passenger.target = (passenger.anchor[0], Floor_To_Y(message.floor))
-                    #位于等待位置上，前往电梯里
+                    elif message.type == 'passenger':
+                        #这里还需要处理一个特殊情况，因为离开电梯和电梯停在某一层是同一tick发生的，因此必须特殊处理，我真是艹了。
+                        #处理的方式是先将这些事件收集起来，在本次tick不进行处理，本tick处理完后额外增加一个tick，再来处理这些乘客的离开。
+                        passenger = passengers.sprites()[message.id]
+                        #视情况而定，passenger要去往哪里
+                        #到达楼层，前往销毁位置处
+                        if message.state == -1:
+                            passenger.target = (DESTROY, passenger.anchor[1])
+                        #站在电梯里，随电梯前往特定位置
+                        elif message.state == -2:
+                            passenger.target = (passenger.anchor[0], Floor_To_Y(message.floor))
+                        #位于等待位置上，前往电梯里
+                        else:
+                            #这里最好再添加一个检查电梯id号是否存在的逻辑
+                            passenger.target = (ELEVATOR_X[message.state], passenger.anchor[1])  
                     else:
-                        #这里最好再添加一个检查电梯id号是否存在的逻辑
-                        passenger.target = (ELEVATOR_X[message.state], passenger.anchor[1])  
-                else:
-                    print("未知消息类型")
+                        print("未知消息类型")
         
             updateing = True
             frame = 0
@@ -171,14 +188,20 @@ def GUI(start_event, finish_event, message_queue):
             #在60帧内完成动画更新工作，然后设置finish_event，通知algorithm进程继续执行
             if frame >= MAX_FRAME:
                 updateing = False
-                #finish_event.set()
+                #我们要这里考虑特殊情况，即是否需要补一个tick
+                if delayed_process == True:
+                    print(f'delay current time',time.perf_counter())
+                    #需要补一个tick，那我们就delayed queue中的内容全部补充道message queue当中。
+                    delayed_process = False
+                    while not delayed_queue.empty():
+                        item = delayed_queue.get()
+                        message_queue.put(item)
+                    print(f'delay1 current time',time.perf_counter())
+                else:
+                    #无特殊情况需要处理，通知调度算法继续即可
+                    # finish_event.set()
+                    pass
 
-
-            
-            
-
-
-        
 
         # 绘制背景
         screen.fill(GRAY)
@@ -191,10 +214,25 @@ def GUI(start_event, finish_event, message_queue):
         pygame.display.flip()
 
         # 控制帧率
-        clock.tick(30)
+        clock.tick(MAX_FRAME)
 
     pygame.quit()
     sys.exit()
 
 
-GUI(None, None, None)
+message_queue = Queue()
+message1 = Message(type = 'init', object= 'elevator', id = 0, floor = 3, state = None)
+message2 = Message(type = 'init', object= 'elevator', id = 1, floor = 2, state = None)
+message3 = Message(type = 'init', object= 'passenger', id = 0, floor = 2.5, state = None)
+message4 = Message(type = 'passenger', object= None, id = 0, floor = 3, state = -2)
+message5 = Message(type = 'init', object= 'passenger', id = 1, floor = 3, state = None)
+message6 = Message(type = 'passenger', object= 'passenger', id = 0, floor = 3, state = -1, delay = True)
+message7 = Message(type = 'passenger', object= 'passenger', id = 1, floor = 3, state = -1, delay = True)
+message_queue.put(message1)
+message_queue.put(message2)
+message_queue.put(message3)
+message_queue.put(message4)
+message_queue.put(message5)
+message_queue.put(message6)
+message_queue.put(message7)
+GUI(None, None, message_queue)

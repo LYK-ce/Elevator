@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     algorithm = Process(target=Start_Algorithm, args=(start_event, finish_event, message_queue))
     gui = Process(target=GUI,args=(start_event, finish_event, message_queue))
-    algorithm.start()
-    gui.start() 
+    algorithm.start(start_event,finish_event,message_queue)
+    gui.start(start_event,finish_event,message_queue) 
 
     algorithm.join()

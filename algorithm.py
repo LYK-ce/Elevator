@@ -5,12 +5,18 @@ from elevator_saga.client.base_controller import ElevatorController
 from elevator_saga.client.proxy_models import ProxyElevator, ProxyFloor, ProxyPassenger
 from elevator_saga.core.models import Direction, SimulationEvent
 from GUI import GUI
+from utils import Message
 
 class ElevatorBusExampleController(ElevatorController):
-    def __init__(self) -> None:
+    def __init__(self, start_event, finish_event, message_queue) -> None:
         super().__init__("http://127.0.0.1:8000", True)
         self.all_passengers: List[ProxyPassenger] = []
         self.max_floor = 0
+
+        #用于与GUI进程进行通信的同步变量和消息队列
+        self.start_event = start_event
+        self.finish_event = finish_event    
+        self.message_queue = message_queue
 
     def on_init(self, elevators: List[ProxyElevator], floors: List[ProxyFloor]) -> None:
         self.max_floor = floors[-1].floor
@@ -37,11 +43,23 @@ class ElevatorBusExampleController(ElevatorController):
     def on_event_execute_end(
         self, tick: int, events: List[SimulationEvent], elevators: List[ProxyElevator], floors: List[ProxyFloor]
     ) -> None:
-        for passenger in self.all_passengers:
-            # print(
-            #     f"🧍 乘客 P{passenger.id} 在floor {passenger.floor}")
-            print(passenger._get_passenger_info())
+        # print(f"Tick {tick}: 处理了 {len(events)} 个事件 {[e.type.value for e in events]}")
+        # for i in elevators:
+        #     print(
+        #         f"\t{i.id}[{i.target_floor_direction.value},{i.current_floor_float}/{i.target_floor}]"
+        #         + "👦" * len(i.passengers),
+        #         end="",
+        #     )
+        for e in events:
+            print(e)
+        print()
         #time.sleep(1)
+        #在每一个tick处理完毕之后，我们需要通知GUI进程进行更新，然后等待GUI完成更新
+
+        # #消息已经准备好了，通知GUI进程可以进行更新
+        # self.start_event.set()
+        # #等待GUI进程完成更新
+        # self.finish_event.wait()
 
     def on_passenger_call(self, passenger: ProxyPassenger, floor: ProxyFloor, direction: str) -> None:
         print(f"📞 乘客 P{passenger.id} 在 F{floor.floor} 呼叫电梯 {direction}")
@@ -79,5 +97,7 @@ class ElevatorBusExampleController(ElevatorController):
 
 
 def Start_Algorithm(start_event, finish_event, message_queue):
-    algorithm = ElevatorBusExampleController()
+    algorithm = ElevatorBusExampleController(start_event, finish_event, message_queue)
     algorithm.start()
+
+Start_Algorithm(None,None,None)
