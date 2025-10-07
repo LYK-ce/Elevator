@@ -89,7 +89,7 @@ class ElevatorBusExampleController(ElevatorController):
                 self.message_queue.put(new_message)
             #乘客离开电梯事件，注意，由于模拟器把停靠和离开放在同一tick里，因此这里是delay事件
             elif e.type.value == 'passenger_alight':
-                new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = True)
+                new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = False)
                 self.message_queue.put(new_message)
         #消息已经准备好了，通知GUI进程可以进行更新
         self.start_event.set()

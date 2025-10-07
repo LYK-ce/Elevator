@@ -15,6 +15,7 @@ import time
 WAITING = 100
 WAITING_RANDOM = 100
 ELEVATOR_X = [275, 425, 575, 725]
+ELEVATOR_RANDOM = 24
 DESTROY = 900
 FLOOR_HEIGHT = 150
 MAX_FRAME = 30
@@ -126,9 +127,7 @@ def GUI(start_event, finish_event, message_queue):
             # print(f'updating current time',time.perf_counter())
             #根据message_queue中的信息，更新电梯和乘客的target位置
             while not message_queue.empty():
-                print('GUI received message')
                 message = message_queue.get()
-                print("GUI收到消息：", message)
                 if message.delay == True:
                 #如果出现了delay的message，表示此消息要暂缓一个tick执行，放在下一个tick执行，因此先将其暂存到delaye queue当中。
                     message.delay = False
@@ -149,7 +148,9 @@ def GUI(start_event, finish_event, message_queue):
 
                         elif message.object== 'passenger':
                             #在waiting位置上随机偏移一个位置生成对应的角色
-                            new_person = Person(WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor), 'Sprite\passenger01.png')
+                            #先创建在camera外面，然后走进视野内
+                            new_person = Person(-100, Floor_To_Y(message.floor), 'Sprite\passenger01.png')
+                            new_person.target = (WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor))
                             new_person.id = message.id
                             passengers.add(new_person)
                             
@@ -161,7 +162,6 @@ def GUI(start_event, finish_event, message_queue):
                     elif message.type == 'passenger':
                         #这里还需要处理一个特殊情况，因为离开电梯和电梯停在某一层是同一tick发生的，因此必须特殊处理，我真是艹了。
                         #处理的方式是先将这些事件收集起来，在本次tick不进行处理，本tick处理完后额外增加一个tick，再来处理这些乘客的离开。
-                        print(message.id)
                         #电梯是从0开始编号的，乘客却是从1开始编号的，吐了
                         passenger = passengers.sprites()[message.id-1]
                         #视情况而定，passenger要去往哪里
@@ -174,7 +174,7 @@ def GUI(start_event, finish_event, message_queue):
                         #位于等待位置上，前往电梯里
                         else:
                             #这里最好再添加一个检查电梯id号是否存在的逻辑
-                            passenger.target = (ELEVATOR_X[message.state], passenger.anchor[1])  
+                            passenger.target = (ELEVATOR_X[message.state]+random.randint(-ELEVATOR_RANDOM,ELEVATOR_RANDOM), passenger.anchor[1])  
                     else:
                         print("未知消息类型")
         
