@@ -19,6 +19,7 @@ ELEVATOR_RANDOM = 24
 DESTROY = 900
 FLOOR_HEIGHT = 150
 MAX_FRAME = 30
+RATE = 1
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
@@ -56,8 +57,8 @@ class Elevator(pygame.sprite.Sprite):
 
     def update(self, frame):
         #根据anchor和target之间的距离，计算相对位置
-        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / MAX_FRAME
-        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / MAX_FRAME
+        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / (MAX_FRAME * RATE)
+        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / (MAX_FRAME * RATE)
         self.Anchor_To_Rect()
         
 
@@ -84,10 +85,14 @@ class Person(pygame.sprite.Sprite):
         return self.rect
     
     def update(self, frame):
+        if self.anchor[0] == DESTROY:
+            return
         #根据anchor和target之间的距离，计算相对位置
-        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / MAX_FRAME
-        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / MAX_FRAME
+        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / (MAX_FRAME * RATE)
+        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / (MAX_FRAME * RATE)
         self.Anchor_To_Rect()
+        
+            
    
  
 def GUI(start_event, finish_event, message_queue):
@@ -162,6 +167,11 @@ def GUI(start_event, finish_event, message_queue):
                     elif message.type == 'passenger':
                         #这里还需要处理一个特殊情况，因为离开电梯和电梯停在某一层是同一tick发生的，因此必须特殊处理，我真是艹了。
                         #处理的方式是先将这些事件收集起来，在本次tick不进行处理，本tick处理完后额外增加一个tick，再来处理这些乘客的离开。
+                        
+                        #10.7实际运行起来和预期的还是不一样，虽然停在一层的tick和上电梯的tick不是同一个tick，这也意味着当乘客上电梯时电梯已经离开了，就会出现乘客没有正确站在电梯的位置上的问题。真是遭不住啊。
+
+
+                    
                         #电梯是从0开始编号的，乘客却是从1开始编号的，吐了
                         passenger = passengers.sprites()[message.id-1]
                         #视情况而定，passenger要去往哪里
@@ -189,7 +199,7 @@ def GUI(start_event, finish_event, message_queue):
             passengers.update(frame)
 
             #在60帧内完成动画更新工作，然后设置finish_event，通知algorithm进程继续执行
-            if frame >= MAX_FRAME:
+            if frame >= (MAX_FRAME * RATE):
                 updateing = False
                 #我们要这里考虑特殊情况，即是否需要补一个tick
                 if delayed_process == True:
