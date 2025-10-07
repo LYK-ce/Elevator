@@ -22,9 +22,9 @@ MAX_FRAME = 30
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
 
-#楼层到y坐标的转换函数，记住，楼层是从第一层开始的。
+#楼层到y坐标的转换函数，记住，楼层是从第0层开始的。
 def Floor_To_Y(floor):
-    return 950 - (floor - 1) * FLOOR_HEIGHT
+    return 950 - (floor) * FLOOR_HEIGHT
 
 
 # 设置颜色
@@ -121,13 +121,14 @@ def GUI(start_event, finish_event, message_queue):
                 running = False
         
         #必须等到调度算法的一个tick完成之后，同时不处在更新状态时才能进行下一次更新
-        #if start_event.is_set() and not updateing:
-        if not updateing:
-            print(f'updating current time',time.perf_counter())
+        if start_event.is_set() and not updateing:
+        # if not updateing:
+            # print(f'updating current time',time.perf_counter())
             #根据message_queue中的信息，更新电梯和乘客的target位置
             while not message_queue.empty():
+                print('GUI received message')
                 message = message_queue.get()
-                #print("GUI收到消息：", message)
+                print("GUI收到消息：", message)
                 if message.delay == True:
                 #如果出现了delay的message，表示此消息要暂缓一个tick执行，放在下一个tick执行，因此先将其暂存到delaye queue当中。
                     message.delay = False
@@ -160,7 +161,9 @@ def GUI(start_event, finish_event, message_queue):
                     elif message.type == 'passenger':
                         #这里还需要处理一个特殊情况，因为离开电梯和电梯停在某一层是同一tick发生的，因此必须特殊处理，我真是艹了。
                         #处理的方式是先将这些事件收集起来，在本次tick不进行处理，本tick处理完后额外增加一个tick，再来处理这些乘客的离开。
-                        passenger = passengers.sprites()[message.id]
+                        print(message.id)
+                        #电梯是从0开始编号的，乘客却是从1开始编号的，吐了
+                        passenger = passengers.sprites()[message.id-1]
                         #视情况而定，passenger要去往哪里
                         #到达楼层，前往销毁位置处
                         if message.state == -1:
@@ -177,7 +180,7 @@ def GUI(start_event, finish_event, message_queue):
         
             updateing = True
             frame = 0
-            #start_event.clear()
+            
         
         if updateing:
             frame += 1
@@ -190,16 +193,17 @@ def GUI(start_event, finish_event, message_queue):
                 updateing = False
                 #我们要这里考虑特殊情况，即是否需要补一个tick
                 if delayed_process == True:
-                    print(f'delay current time',time.perf_counter())
+                    # print(f'delay current time',time.perf_counter())
                     #需要补一个tick，那我们就delayed queue中的内容全部补充道message queue当中。
                     delayed_process = False
                     while not delayed_queue.empty():
                         item = delayed_queue.get()
                         message_queue.put(item)
-                    print(f'delay1 current time',time.perf_counter())
+                    # print(f'delay1 current time',time.perf_counter())
                 else:
                     #无特殊情况需要处理，通知调度算法继续即可
-                    # finish_event.set()
+                    start_event.clear()
+                    finish_event.set()
                     pass
 
 
@@ -220,19 +224,19 @@ def GUI(start_event, finish_event, message_queue):
     sys.exit()
 
 
-message_queue = Queue()
-message1 = Message(type = 'init', object= 'elevator', id = 0, floor = 3, state = None)
-message2 = Message(type = 'init', object= 'elevator', id = 1, floor = 2, state = None)
-message3 = Message(type = 'init', object= 'passenger', id = 0, floor = 2.5, state = None)
-message4 = Message(type = 'passenger', object= None, id = 0, floor = 3, state = -2)
-message5 = Message(type = 'init', object= 'passenger', id = 1, floor = 3, state = None)
-message6 = Message(type = 'passenger', object= 'passenger', id = 0, floor = 3, state = -1, delay = True)
-message7 = Message(type = 'passenger', object= 'passenger', id = 1, floor = 3, state = -1, delay = True)
-message_queue.put(message1)
-message_queue.put(message2)
-message_queue.put(message3)
-message_queue.put(message4)
-message_queue.put(message5)
-message_queue.put(message6)
-message_queue.put(message7)
-GUI(None, None, message_queue)
+# message_queue = Queue()
+# message1 = Message(type = 'init', object= 'elevator', id = 0, floor = 3, state = None)
+# message2 = Message(type = 'init', object= 'elevator', id = 1, floor = 2, state = None)
+# message3 = Message(type = 'init', object= 'passenger', id = 0, floor = 2.5, state = None)
+# message4 = Message(type = 'passenger', object= None, id = 0, floor = 3, state = -2)
+# message5 = Message(type = 'init', object= 'passenger', id = 1, floor = 3, state = None)
+# message6 = Message(type = 'passenger', object= 'passenger', id = 0, floor = 3, state = -1, delay = True)
+# message7 = Message(type = 'passenger', object= 'passenger', id = 1, floor = 3, state = -1, delay = True)
+# message_queue.put(message1)
+# message_queue.put(message2)
+# message_queue.put(message3)
+# message_queue.put(message4)
+# message_queue.put(message5)
+# message_queue.put(message6)
+# message_queue.put(message7)
+# GUI(None, None, message_queue)
