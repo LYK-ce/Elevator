@@ -78,7 +78,7 @@ class ElevatorBusExampleController(ElevatorController):
         #处理用户初始化，登上电梯以及离开电梯的事件
         for e in events:
             #乘客的初始化事件
-            if e.type.value == 'down_button_pressed':
+            if e.type.value == 'down_button_pressed' or e.type.value == 'up_button_pressed':
                 new_message = Message(type = 'init', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = None)
                 self.message_queue.put(new_message)
             #乘客登上电梯事件

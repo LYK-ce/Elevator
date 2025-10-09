@@ -13,7 +13,7 @@ from utils import Message
 import time
 #定义常量
 WAITING = 100
-WAITING_RANDOM = 100
+WAITING_RANDOM = 50
 ELEVATOR_X = [275, 425, 575, 725]
 ELEVATOR_RANDOM = 24
 DESTROY = 900
@@ -173,7 +173,9 @@ def GUI(start_event, finish_event, message_queue):
 
                     
                         #电梯是从0开始编号的，乘客却是从1开始编号的，吐了
+                        
                         passenger = passengers.sprites()[message.id-1]
+                        print('------passenger message----------:',message.id,passenger.id)
                         #视情况而定，passenger要去往哪里
                         #到达楼层，前往销毁位置处
                         if message.state == -1:
