@@ -17,6 +17,7 @@ class ElevatorBusExampleController(ElevatorController):
         self.start_event = start_event
         self.finish_event = finish_event    
         self.message_queue = message_queue
+        self.board = False
 
     def on_init(self, elevators: List[ProxyElevator], floors: List[ProxyFloor]) -> None:
         self.max_floor = floors[-1].floor
@@ -67,15 +68,9 @@ class ElevatorBusExampleController(ElevatorController):
         print()
         #time.sleep(1)
         #在每一个tick处理完毕之后，我们需要通知GUI进程进行更新，然后等待GUI完成更新
-        #首先处理电梯的信息,不管是否处在stopped状态，都为它创建一个更新事件
-        for e in elevators:
-            new_message = Message(type = 'elevator', object= None, id = e.id, floor = e.current_floor_float, state = 0)
-            self.message_queue.put(new_message)
-            #为电梯中的每个用户创建事件
-            for p in e.passengers:
-                new_message = Message(type = 'passenger', object= None, id = p, floor = e.current_floor_float, state = -2)
-                self.message_queue.put(new_message)
+        
         #处理用户初始化，登上电梯以及离开电梯的事件
+        self.board = False
         for e in events:
             #乘客的初始化事件
             if e.type.value == 'down_button_pressed' or e.type.value == 'up_button_pressed':
@@ -87,9 +82,27 @@ class ElevatorBusExampleController(ElevatorController):
                 print(f'{e.data['passenger']} floor = {e.data['floor']}, state = {e.data['elevator']}')
                 new_message = Message(type = 'passenger', object= None, id = e.data['passenger'], floor = e.data['floor'], state = e.data['elevator'])
                 self.message_queue.put(new_message)
+                #由于存在乘客离开的事件，因此电梯移动需要设置为delay事件
+                self.board = True
             #乘客离开电梯事件，注意，由于模拟器把停靠和离开放在同一tick里，因此这里是delay事件
             elif e.type.value == 'passenger_alight':
-                new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = False)
+                #乘客下电梯时已经不在电梯内不了，检索不到，所以这里自己再塞入一个事件
+                new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = (e.data['floor']), state = -2, delay = False)
+                self.message_queue.put(new_message)
+                new_message2 = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = True)
+                self.message_queue.put(new_message2)
+        
+        #首先处理电梯的信息,不管是否处在stopped状态，都为它创建一个更新事件
+        for e in elevators:
+            if self.board:
+                delay = True    
+            else:
+                delay = False   
+            new_message = Message(type = 'elevator', object= None, id = e.id, floor = e.current_floor_float, state = 0, delay= delay)
+            self.message_queue.put(new_message)
+            #为电梯中的每个用户创建事件
+            for p in e.passengers:
+                new_message = Message(type = 'passenger', object= None, id = p, floor = e.current_floor_float, state = -2,delay= delay)
                 self.message_queue.put(new_message)
         #消息已经准备好了，通知GUI进程可以进行更新
         self.start_event.set()

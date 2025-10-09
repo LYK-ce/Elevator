@@ -18,3 +18,6 @@ Update Log:
 
 10.9 version 0.94
 解决了一个小bug，之前忘了把up button pressed事件添加进去导致上楼的乘客不能正确生成
+
+10.9 version 0.95
+解决了动画脱节的问题。接下来把sprite内容完善一下即可。
