@@ -79,7 +79,7 @@ class ElevatorBusExampleController(ElevatorController):
             #乘客登上电梯事件
             elif e.type.value == 'passenger_board':
                 print('------passenger board----------:')
-                print(f'{e.data['passenger']} floor = {e.data['floor']}, state = {e.data['elevator']}')
+                print(f"{e.data['passenger']} floor = {e.data['floor']}, state = {e.data['elevator']}")
                 new_message = Message(type = 'passenger', object= None, id = e.data['passenger'], floor = e.data['floor'], state = e.data['elevator'])
                 self.message_queue.put(new_message)
                 #由于存在乘客离开的事件，因此电梯移动需要设置为delay事件
