@@ -18,8 +18,8 @@ ELEVATOR_X = [275, 425, 575, 725]
 ELEVATOR_RANDOM = 24
 DESTROY = 900
 FLOOR_HEIGHT = 150
-MAX_FRAME = 30
-RATE = 1
+MAX_FRAME = 60
+RATE = 0.5
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 1000
@@ -41,9 +41,12 @@ class Elevator(pygame.sprite.Sprite):
         self.id = _id
         #定义sprite的锚点
         self.anchor = [x, y]
+        self.src = [x,y]
         self.rect = self.image.get_rect()
         self.rect.x = self.anchor[0] - self.rect.width // 2
         self.rect.y = self.anchor[1] - self.rect.height
+        self.velocityx = 0
+        self.velocityy = 0
 
         self.target = (x, y)
     
@@ -57,9 +60,11 @@ class Elevator(pygame.sprite.Sprite):
 
     def update(self, frame):
         #根据anchor和target之间的距离，计算相对位置
-        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / (MAX_FRAME * RATE)
-        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / (MAX_FRAME * RATE)
+        self.anchor[0] = self.anchor[0] + (self.target[0] - self.src[0]) * 1 / (MAX_FRAME * RATE)
+        self.anchor[1] = self.anchor[1] + (self.target[1] - self.src[1]) * 1 / (MAX_FRAME * RATE)
         self.Anchor_To_Rect()
+        if frame >= (MAX_FRAME * RATE):
+            self.src = self.anchor.copy()
         
 
 # 定义乘客类
@@ -70,6 +75,7 @@ class Person(pygame.sprite.Sprite):
         self.id = _id
         #定义sprite的锚点
         self.anchor = [x, y]
+        self.src = [x,y]
         self.rect = self.image.get_rect()
         self.rect.x = self.anchor[0] - self.rect.width // 2
         self.rect.y = self.anchor[1] - self.rect.height
@@ -88,9 +94,11 @@ class Person(pygame.sprite.Sprite):
         if self.anchor[0] == DESTROY:
             return
         #根据anchor和target之间的距离，计算相对位置
-        self.anchor[0] = self.anchor[0] + (self.target[0] - self.anchor[0]) * frame / (MAX_FRAME * RATE)
-        self.anchor[1] = self.anchor[1] + (self.target[1] - self.anchor[1]) * frame / (MAX_FRAME * RATE)
+        self.anchor[0] = self.anchor[0] + (self.target[0] - self.src[0]) * 1 / (MAX_FRAME * RATE)
+        self.anchor[1] = self.anchor[1] + (self.target[1] - self.src[1]) * 1 / (MAX_FRAME * RATE)
         self.Anchor_To_Rect()
+        if frame >= (MAX_FRAME * RATE):
+            self.src = self.anchor.copy()
         
             
    
@@ -100,7 +108,6 @@ def GUI(start_event, finish_event, message_queue):
     pygame.init()
 
     # 设置窗口大小
-    screen_width, screen_height = 1000, 1000
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("电梯调度算法可视化")
 
@@ -121,6 +128,7 @@ def GUI(start_event, finish_event, message_queue):
     updateing = False
     clock = pygame.time.Clock()
     frame = 0
+    t2 = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -156,6 +164,7 @@ def GUI(start_event, finish_event, message_queue):
                             #先创建在camera外面，然后走进视野内
                             new_person = Person(-100, Floor_To_Y(message.floor), 'Sprite\passenger01.png')
                             new_person.target = (WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor))
+                            new_person.src = new_person.anchor.copy()
                             new_person.id = message.id
                             passengers.add(new_person)
                             
@@ -163,6 +172,9 @@ def GUI(start_event, finish_event, message_queue):
                     elif message.type == 'elevator':
                         elevator = elevators.sprites()[message.id]
                         elevator.target = (ELEVATOR_X[message.id], Floor_To_Y(message.floor))   
+                        elevator.src = elevator.anchor.copy()
+                        print(message.floor)
+                        print('------elevator message----------:',elevator.id,elevator.anchor,elevator.target)
 
                     elif message.type == 'passenger':
                         #这里还需要处理一个特殊情况，因为离开电梯和电梯停在某一层是同一tick发生的，因此必须特殊处理，我真是艹了。
@@ -180,18 +192,24 @@ def GUI(start_event, finish_event, message_queue):
                         #到达楼层，前往销毁位置处
                         if message.state == -1:
                             passenger.target = (DESTROY, passenger.anchor[1])
+                            passenger.src = passenger.anchor.copy()
                         #站在电梯里，随电梯前往特定位置
                         elif message.state == -2:
                             passenger.target = (passenger.anchor[0], Floor_To_Y(message.floor))
+                            passenger.src = passenger.anchor.copy()
                         #位于等待位置上，前往电梯里
                         else:
                             #这里最好再添加一个检查电梯id号是否存在的逻辑
                             passenger.target = (ELEVATOR_X[message.state]+random.randint(-ELEVATOR_RANDOM,ELEVATOR_RANDOM), passenger.anchor[1])  
+                            passenger.src = passenger.anchor.copy()
                     else:
                         print("未知消息类型")
         
             updateing = True
             frame = 0
+            t1 = time.perf_counter()
+            print(f'update start time',t1)
+           
             
         
         if updateing:
@@ -231,6 +249,7 @@ def GUI(start_event, finish_event, message_queue):
 
         # 控制帧率
         clock.tick(MAX_FRAME)
+        
 
     pygame.quit()
     sys.exit()
