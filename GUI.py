@@ -11,22 +11,24 @@ from multiprocessing import Event, Queue
 import random
 from utils import Message
 import time
+import os
 #定义常量
 WAITING = 100
 WAITING_RANDOM = 50
-ELEVATOR_X = [275, 425, 575, 725]
+ELEVATOR_X = [250, 350, 450, 550, 650]
 ELEVATOR_RANDOM = 24
-DESTROY = 900
-FLOOR_HEIGHT = 150
+DESTROY = 750
+FLOOR_HEIGHT = 96
 MAX_FRAME = 60
 RATE = 0.5
+SPRITEDIR = 'Sprite'
 
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 1000
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 800
 
 #楼层到y坐标的转换函数，记住，楼层是从第0层开始的。
 def Floor_To_Y(floor):
-    return 950 - (floor) * FLOOR_HEIGHT
+    return SCREEN_HEIGHT - 100 - (floor) * FLOOR_HEIGHT
 
 
 # 设置颜色
@@ -111,10 +113,38 @@ def GUI(start_event, finish_event, message_queue):
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("电梯调度算法可视化")
 
+    #创建环境精灵组
+    background = pygame.sprite.Sprite()
+    background.image = pygame.image.load(os.path.join(SPRITEDIR, 'background.png'))
+
+    wall = pygame.sprite.Sprite()
+    wall.image = pygame.image.load(os.path.join(SPRITEDIR, 'wall.png'))
+    wall.rect = wall.image.get_rect()
+    wall.rect.x = 700
+
+    floors = pygame.sprite.Group()
+    for i in range(7):
+        floor = pygame.sprite.Sprite()
+        floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floor.png'))
+        floor.rect = floor.image.get_rect()
+        floor.rect.x = 0
+        floor.rect.y = Floor_To_Y(i)
+        floors.add(floor)
+    
+    floorbackgrounds = pygame.sprite.Group()
+    for i in range(6):
+        floor = pygame.sprite.Sprite()
+        floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floorbackground.png'))
+        floor.rect = floor.image.get_rect()
+        floor.rect.x = 0
+        floor.rect.y = Floor_To_Y(i) - FLOOR_HEIGHT 
+        floorbackgrounds.add(floor)
+
 
     # 创建电梯和乘客的精灵组
     elevators = pygame.sprite.Group()
     passengers = pygame.sprite.Group()
+    tunnels = pygame.sprite.Group()
 
     elevator_num = 0
 
@@ -153,16 +183,25 @@ def GUI(start_event, finish_event, message_queue):
                 #对于乘客消息，更新电梯位置，需要注意的是，位于电梯中的乘客随电梯上升或者下降位置也需要设置成事件发送过来
                     if message.type == 'init':
                         if message.object== 'elevator':
-                            new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor), 'Sprite\elevator.png')
+                            new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor), os.path.join(SPRITEDIR, 'elevator.png'))
                             new_elevator.id = message.id
                             print("创建电梯对象：", new_elevator)
                             elevators.add(new_elevator)
                             elevator_num += 1
 
+                            #创建电梯的同时增减电梯井
+                            tunnel = pygame.sprite.Sprite()
+                            tunnel.image = pygame.image.load(os.path.join(SPRITEDIR, 'tunnel.png'))
+                            tunnel.rect = tunnel.image.get_rect()
+                            tunnel.rect.x = ELEVATOR_X[elevator_num-1] - tunnel.rect.width // 2
+                            tunnel.rect.y = 124  
+                            tunnels.add(tunnel)
+
                         elif message.object== 'passenger':
                             #在waiting位置上随机偏移一个位置生成对应的角色
                             #先创建在camera外面，然后走进视野内
-                            new_person = Person(-100, Floor_To_Y(message.floor), 'Sprite\passenger01.png')
+                            target = random.randint(1,4)
+                            new_person = Person(-100, Floor_To_Y(message.floor), os.path.join(SPRITEDIR, f'passenger{target}.png'))
                             new_person.target = (WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor))
                             new_person.src = new_person.anchor.copy()
                             new_person.id = message.id
@@ -240,9 +279,18 @@ def GUI(start_event, finish_event, message_queue):
         # 绘制背景
         screen.fill(GRAY)
 
+        #screen.blit(background.image, (0, 0))
+        
         # 绘制电梯和乘客
+        floorbackgrounds.draw(screen)
+        
+        tunnels.draw(screen)
         elevators.draw(screen)
         passengers.draw(screen)
+        floors.draw(screen)
+
+        #最后绘制墙壁
+        screen.blit(wall.image, wall.rect)
 
         # 更新屏幕
         pygame.display.flip()
