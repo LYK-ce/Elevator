@@ -14,3 +14,5 @@ if __name__ == "__main__":
     gui.start() 
 
     algorithm.join()
+    gui.terminate()
+    gui.join()
