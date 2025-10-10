@@ -23,6 +23,4 @@ Update Log:
 解决了动画脱节的问题。接下来把sprite内容完善一下即可。
 
 10.10 version 1.0
-修复了windows和linux系统下路径名不同的问题。
-
-更新了sprite素材，现在增加了环境sprite，人物sprite。到这里GUI的初始版本就算是完成了。
+修复了windows和linux系统下路径名不同的问题。更新了sprite素材，现在增加了环境sprite，人物sprite。到这里GUI的初始版本就算是完成了。
