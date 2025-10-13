@@ -24,3 +24,6 @@ Update Log:
 
 10.10 version 1.0
 修复了windows和linux系统下路径名不同的问题。更新了sprite素材，现在增加了环境sprite，人物sprite。到这里GUI的初始版本就算是完成了。
+
+10.13 version 1.0
+更新了课程要求的运行脚本
