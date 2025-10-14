@@ -4,6 +4,12 @@ The GUI part is presented by LiYongKang
 
 GUI is built with pygame
 
+Todo:
+看起来不能通过message queue的方式来做，而是应该通过监听端口的方式来做。
+所以接下来：
+1. 修改当前内容，通过端口的方式来接收动画
+2. 最大可以达到20层，四部电梯，需要根据动画层数来缩放我们使用的sprite
+
 Update Log:
 
 10.7 version 0.92

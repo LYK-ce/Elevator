@@ -44,6 +44,10 @@ class ElevatorBusExampleController(ElevatorController):
         for e in elevators:
             print(f'{e.id} floor:{e.current_floor_float}')
         print("---------------------------------")
+        # 把楼层的数量传递给GUI
+        new_message = Message(type = 'init', object= 'floor', id = -1, floor =20, state = None)
+        self.message_queue.put(new_message)
+        
         # 将电梯的初始化事件加入到 message queue 当中
         for e in elevators:
             new_message = Message(type = 'init', object= 'elevator', id = e.id, floor = e.current_floor, state = None)

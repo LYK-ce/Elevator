@@ -21,15 +21,24 @@ ELEVATOR_RANDOM = 24
 DESTROY = 750
 FLOOR_HEIGHT = 96
 MAX_FRAME = 60
-RATE = 0.05
+RATE = 1
 SPRITEDIR = 'Sprite'
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 
+#楼层的高度不是最大6层，因此必须要根据楼层的高度来动态调整每个sprite的大小。
+#默认楼层高度是6层
+DEFAULT_FLOOR = 6
+num_of_floors = 0
+scale_factor = 1.0
+
 #楼层到y坐标的转换函数，记住，楼层是从第0层开始的。
-def Floor_To_Y(floor):
-    return SCREEN_HEIGHT - 100 - (floor) * FLOOR_HEIGHT
+#根据scale factor调整每一层层间距的大小。
+def Floor_To_Y(floor, scale_factor = 1.0):
+    print(scale_factor)
+    return SCREEN_HEIGHT - 100 - (floor) * FLOOR_HEIGHT * scale_factor
+
 
 
 # 设置颜色
@@ -38,9 +47,11 @@ GRAY = (200, 200, 200)
 # 定义电梯类
 class Elevator(pygame.sprite.Sprite):
     #输入的x和y是电梯锚点的位置，锚点位于image的bottom center位置上
-    def __init__(self, x, y, _image_path = None, _id = None):
+    def __init__(self, x, y, _image_path = None, _id = None, scale_factor = 1.0):
         super().__init__()
+        #加载图像并进行缩放
         self.image = pygame.image.load(_image_path) 
+        self.image = pygame.transform.scale_by(self.image, scale_factor)
         self.id = _id
         #定义sprite的锚点
         self.anchor = [x, y]
@@ -52,6 +63,7 @@ class Elevator(pygame.sprite.Sprite):
         self.velocityy = 0
 
         self.target = (x, y)
+        
     
     def Rect_To_Anchor(self):
         self.anchor = (self.rect.x + self.rect.width // 2, self.rect.y + self.rect.height)
@@ -72,9 +84,11 @@ class Elevator(pygame.sprite.Sprite):
 
 # 定义乘客类
 class Person(pygame.sprite.Sprite):
-    def __init__(self, x, y, _image_path, _id = None):
+    def __init__(self, x, y, _image_path, _id = None, scale_factor = 1.0):
         super().__init__()
+        #加载图像并进行缩放
         self.image = pygame.image.load(_image_path) 
+        self.image = pygame.transform.scale_by(self.image, scale_factor)
         self.id = _id
         #定义sprite的锚点
         self.anchor = [x, y]
@@ -124,22 +138,10 @@ def GUI(start_event, finish_event, message_queue):
     wall.rect.x = 700
 
     floors = pygame.sprite.Group()
-    for i in range(7):
-        floor = pygame.sprite.Sprite()
-        floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floor.png'))
-        floor.rect = floor.image.get_rect()
-        floor.rect.x = 0
-        floor.rect.y = Floor_To_Y(i)
-        floors.add(floor)
+    
     
     floorbackgrounds = pygame.sprite.Group()
-    for i in range(6):
-        floor = pygame.sprite.Sprite()
-        floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floorbackground.png'))
-        floor.rect = floor.image.get_rect()
-        floor.rect.x = 0
-        floor.rect.y = Floor_To_Y(i) - FLOOR_HEIGHT 
-        floorbackgrounds.add(floor)
+    
 
 
     # 创建电梯和乘客的精灵组
@@ -184,7 +186,7 @@ def GUI(start_event, finish_event, message_queue):
                 #对于乘客消息，更新电梯位置，需要注意的是，位于电梯中的乘客随电梯上升或者下降位置也需要设置成事件发送过来
                     if message.type == 'init':
                         if message.object== 'elevator':
-                            new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor), os.path.join(SPRITEDIR, 'elevator.png'))
+                            new_elevator = Elevator(ELEVATOR_X[elevator_num], Floor_To_Y(message.floor,scale_factor=scale_factor), os.path.join(SPRITEDIR, 'elevator.png'), scale_factor = scale_factor)
                             new_elevator.id = message.id
                             print("创建电梯对象：", new_elevator)
                             elevators.add(new_elevator)
@@ -193,25 +195,58 @@ def GUI(start_event, finish_event, message_queue):
                             #创建电梯的同时增减电梯井
                             tunnel = pygame.sprite.Sprite()
                             tunnel.image = pygame.image.load(os.path.join(SPRITEDIR, 'tunnel.png'))
+                            #高度不变，只变宽度
+                            tunnel.image = pygame.transform.scale(tunnel.image, (int(tunnel.image.get_width()*scale_factor), FLOOR_HEIGHT * num_of_floors * scale_factor))
                             tunnel.rect = tunnel.image.get_rect()
                             tunnel.rect.x = ELEVATOR_X[elevator_num-1] - tunnel.rect.width // 2
-                            tunnel.rect.y = 124  
+                            tunnel.rect.y = 100 + FLOOR_HEIGHT * scale_factor
                             tunnels.add(tunnel)
 
                         elif message.object== 'passenger':
                             #在waiting位置上随机偏移一个位置生成对应的角色
                             #先创建在camera外面，然后走进视野内
                             target = random.randint(1,4)
-                            new_person = Person(-100, Floor_To_Y(message.floor), os.path.join(SPRITEDIR, f'passenger{target}.png'))
-                            new_person.target = (WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor))
+                            new_person = Person(-100, Floor_To_Y(message.floor,scale_factor=scale_factor), os.path.join(SPRITEDIR, f'passenger{target}.png'), scale_factor= scale_factor)
+                            new_person.target = (WAITING + random.randint(-WAITING_RANDOM,WAITING_RANDOM), Floor_To_Y(message.floor,scale_factor=scale_factor))
                             new_person.src = new_person.anchor.copy()
                             new_person.id = message.id
                             passengers.add(new_person)
+                        
+                        elif message.object== 'floor':
+                            num_of_floors = message.floor
+                            print('floor num:',num_of_floors)
+                            scale_factor = DEFAULT_FLOOR / num_of_floors
+                            print('scale factor:',scale_factor)
+
+                            #初始化楼层
+                            for i in range(num_of_floors + 1):
+                                floor = pygame.sprite.Sprite()
+                                floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floor.png'))
+                                #宽度不变，只变高度
+                                
+                                floor.image = pygame.transform.scale(floor.image, (int(floor.image.get_width()), int(floor.image.get_height()*scale_factor)))
+                                
+                                floor.rect = floor.image.get_rect()
+                                floor.rect.x = 0
+                                floor.rect.y = Floor_To_Y(i,scale_factor=scale_factor)
+                                floors.add(floor)
+                            
+                            for i in range(num_of_floors):
+                                floor = pygame.sprite.Sprite()
+                                floor.image = pygame.image.load(os.path.join(SPRITEDIR, 'floorbackground.png'))
+                                print('floor size:',floor.image.get_size())
+                                floor.image = pygame.transform.scale(floor.image, (int(floor.image.get_width()), int(floor.image.get_height()*scale_factor)))
+                                print('floor size:',floor.image.get_size())
+                                floor.rect = floor.image.get_rect()
+                                floor.rect.x = 0
+                                floor.rect.y = Floor_To_Y(i,scale_factor=scale_factor) - FLOOR_HEIGHT  * scale_factor
+                                floorbackgrounds.add(floor)
+
                             
 
                     elif message.type == 'elevator':
                         elevator = elevators.sprites()[message.id]
-                        elevator.target = (ELEVATOR_X[message.id], Floor_To_Y(message.floor))   
+                        elevator.target = (ELEVATOR_X[message.id], Floor_To_Y(message.floor,scale_factor=scale_factor))   
                         elevator.src = elevator.anchor.copy()
                         print(message.floor)
                         print('------elevator message----------:',elevator.id,elevator.anchor,elevator.target)
@@ -235,12 +270,12 @@ def GUI(start_event, finish_event, message_queue):
                             passenger.src = passenger.anchor.copy()
                         #站在电梯里，随电梯前往特定位置
                         elif message.state == -2:
-                            passenger.target = (passenger.anchor[0], Floor_To_Y(message.floor))
+                            passenger.target = (passenger.anchor[0], Floor_To_Y(message.floor,scale_factor=scale_factor))
                             passenger.src = passenger.anchor.copy()
                         #位于等待位置上，前往电梯里
                         else:
                             #这里最好再添加一个检查电梯id号是否存在的逻辑
-                            passenger.target = (ELEVATOR_X[message.state]+random.randint(-ELEVATOR_RANDOM,ELEVATOR_RANDOM), passenger.anchor[1])  
+                            passenger.target = (ELEVATOR_X[message.state]+random.randint(-ELEVATOR_RANDOM,ELEVATOR_RANDOM)*scale_factor, passenger.anchor[1])  
                             passenger.src = passenger.anchor.copy()
                     else:
                         print("未知消息类型")
