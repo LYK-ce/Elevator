@@ -21,7 +21,7 @@ ELEVATOR_RANDOM = 24
 DESTROY = 750
 FLOOR_HEIGHT = 96
 MAX_FRAME = 60
-RATE = 1
+RATE = 0.05
 SPRITEDIR = 'Sprite'
 
 SCREEN_WIDTH = 800
@@ -199,7 +199,8 @@ def GUI(start_event, finish_event, message_queue):
                             tunnel.image = pygame.transform.scale(tunnel.image, (int(tunnel.image.get_width()*scale_factor), FLOOR_HEIGHT * num_of_floors * scale_factor))
                             tunnel.rect = tunnel.image.get_rect()
                             tunnel.rect.x = ELEVATOR_X[elevator_num-1] - tunnel.rect.width // 2
-                            tunnel.rect.y = 100 + FLOOR_HEIGHT * scale_factor
+                            tunnel.rect.y = 100 
+                            tunnel.rect.y = 700 - FLOOR_HEIGHT * scale_factor * num_of_floors
                             tunnels.add(tunnel)
 
                         elif message.object== 'passenger':

@@ -45,14 +45,15 @@ class ElevatorBusExampleController(ElevatorController):
             print(f'{e.id} floor:{e.current_floor_float}')
         print("---------------------------------")
         # 把楼层的数量传递给GUI
-        new_message = Message(type = 'init', object= 'floor', id = -1, floor =20, state = None)
-        self.message_queue.put(new_message)
-        
-        # 将电梯的初始化事件加入到 message queue 当中
-        for e in elevators:
-            new_message = Message(type = 'init', object= 'elevator', id = e.id, floor = e.current_floor, state = None)
+        if self.message_queue != None:
+            new_message = Message(type = 'init', object= 'floor', id = -1, floor = 20, state = None)
             self.message_queue.put(new_message)
-        pass
+            
+            # 将电梯的初始化事件加入到 message queue 当中
+            for e in elevators:
+                new_message = Message(type = 'init', object= 'elevator', id = e.id, floor = e.current_floor, state = None)
+                self.message_queue.put(new_message)
+
 
     def on_event_execute_start( # 打印即将处理的事件数量及每个事件的类型
         self, tick: int, events: List[SimulationEvent], elevators: List[ProxyElevator], floors: List[ProxyFloor]
@@ -91,51 +92,52 @@ class ElevatorBusExampleController(ElevatorController):
         # Ops: Message 里面的 object 字段好像没用，但目前还是不删掉。
         
         # 处理 events
-        self.board = False
-        for e in events:
-            # 乘客的初始化事件
-            if e.type.value == 'down_button_pressed' or e.type.value == 'up_button_pressed':
-                new_message = Message(type = 'init', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = None, delay = False)
-                self.message_queue.put(new_message)
-            # 乘客登上电梯事件
-            elif e.type.value == 'passenger_board':
-                print('------passenger board----------:\n')
-                print(f"{e.data['passenger']} floor = {e.data['floor']}, state = {e.data['elevator']}")
-                new_message = Message(type = 'passenger', object= None, id = e.data['passenger'], floor = e.data['floor'], state = e.data['elevator'], delay = False)
-                self.message_queue.put(new_message)
+        if self.message_queue != None:
+            self.board = False
+            for e in events:
+                # 乘客的初始化事件
+                if e.type.value == 'down_button_pressed' or e.type.value == 'up_button_pressed':
+                    new_message = Message(type = 'init', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = None, delay = False)
+                    self.message_queue.put(new_message)
+                # 乘客登上电梯事件
+                elif e.type.value == 'passenger_board':
+                    print('------passenger board----------:\n')
+                    print(f"{e.data['passenger']} floor = {e.data['floor']}, state = {e.data['elevator']}")
+                    new_message = Message(type = 'passenger', object= None, id = e.data['passenger'], floor = e.data['floor'], state = e.data['elevator'], delay = False)
+                    self.message_queue.put(new_message)
 
-                # 新增：该乘客已上车，不再算“等待中”
-                self.waiting_passengers.pop(e.data['passenger'], None)
+                    # 新增：该乘客已上车，不再算“等待中”
+                    self.waiting_passengers.pop(e.data['passenger'], None)
 
-                # 本 tick 有乘客上电梯 -> 后续电梯内乘客刷新消息用 delay
-                self.board = True
-            # 乘客离开电梯事件，注意，由于模拟器把停靠和离开放在同一 tick 里，因此这里是 delay 事件
-            elif e.type.value == 'passenger_alight':
-                # 乘客下电梯时不在电梯内了，检索不到，所以这里再塞入一个事件
-                new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = (e.data['floor']), state = -2, delay = False)
+                    # 本 tick 有乘客上电梯 -> 后续电梯内乘客刷新消息用 delay
+                    self.board = True
+                # 乘客离开电梯事件，注意，由于模拟器把停靠和离开放在同一 tick 里，因此这里是 delay 事件
+                elif e.type.value == 'passenger_alight':
+                    # 乘客下电梯时不在电梯内了，检索不到，所以这里再塞入一个事件
+                    new_message = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = (e.data['floor']), state = -2, delay = False)
+                    self.message_queue.put(new_message)
+                    # 如果没有下面这句，GUI 里面，乘客会“漂浮在空中”
+                    new_message2 = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = True)
+                    self.message_queue.put(new_message2)
+            
+            # 处理 elevators
+            for e in elevators:
+                # 如果有乘客上电梯，则 delay
+                if self.board:
+                    delay = True    
+                else:
+                    delay = False   
+                new_message = Message(type = 'elevator', object= None, id = e.id, floor = e.current_floor_float, state = 0, delay= delay)
                 self.message_queue.put(new_message)
-                # 如果没有下面这句，GUI 里面，乘客会“漂浮在空中”
-                new_message2 = Message(type = 'passenger', object= 'passenger', id = e.data['passenger'], floor = e.data['floor'], state = -1, delay = True)
-                self.message_queue.put(new_message2)
-        
-        # 处理 elevators
-        for e in elevators:
-            # 如果有乘客上电梯，则 delay
-            if self.board:
-                delay = True    
-            else:
-                delay = False   
-            new_message = Message(type = 'elevator', object= None, id = e.id, floor = e.current_floor_float, state = 0, delay= delay)
-            self.message_queue.put(new_message)
-            # 为电梯中的每个用户创建事件
-            for p in e.passengers:
-                new_message = Message(type = 'passenger', object= None, id = p, floor = e.current_floor_float, state = -2,delay= delay)
-                self.message_queue.put(new_message)
-        # 消息已经准备好了，通知 GUI 进程可以进行更新
-        self.start_event.set()
-        # 等待 GUI 进程完成更新，这里的 wait 必须后面跟着一个 clear，否则无法生效
-        self.finish_event.wait()
-        self.finish_event.clear()
+                # 为电梯中的每个用户创建事件
+                for p in e.passengers:
+                    new_message = Message(type = 'passenger', object= None, id = p, floor = e.current_floor_float, state = -2,delay= delay)
+                    self.message_queue.put(new_message)
+            # 消息已经准备好了，通知 GUI 进程可以进行更新
+            self.start_event.set()
+            # 等待 GUI 进程完成更新，这里的 wait 必须后面跟着一个 clear，否则无法生效
+            self.finish_event.wait()
+            self.finish_event.clear()
 
     # 以下均为细粒度事件回调（在仿真内核处理 events 时，按需触发）
     def on_passenger_call(self, passenger: ProxyPassenger, floor: ProxyFloor, direction: str) -> None:
