@@ -46,7 +46,7 @@ class ElevatorBusExampleController(ElevatorController):
         print("---------------------------------")
         # 把楼层的数量传递给GUI
         if self.message_queue != None:
-            new_message = Message(type = 'init', object= 'floor', id = -1, floor = 20, state = None)
+            new_message = Message(type = 'init', object= 'floor', id = -1, floor = len(floors), state = None)
             self.message_queue.put(new_message)
             
             # 将电梯的初始化事件加入到 message queue 当中
